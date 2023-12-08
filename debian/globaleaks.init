@@ -117,7 +117,9 @@ network_sandboxing_start()
         return
     fi
 
-    # OUTBOUND
+    iptables -m comment --comment "globaleaks" -A INPUT -j DROP
+    ip6tables -m comment --comment "globaleaks" -A INPUT -j DROP
+
     if [[ "$TOR_SANDBOXING" -eq "1" ]]; then
         declare -a PORTS=("80" "443")
         for PORT in "${PORTS[@]}"; do
@@ -126,16 +128,6 @@ network_sandboxing_start()
             ip6tables -m comment --comment "globaleaks" -A INPUT -p tcp -d :: --dport $PORT -s ::1 -j ACCEPT
             ip6tables -m comment --comment "globaleaks" -A INPUT -p tcp -d :: --dport $PORT -j DROP
         done
-
-        # All outbound connections from GlobaLeaks goes through Tor except of allowed and enstablished connections.
-        iptables -m comment --comment "globaleaks" -A OUTPUT -m state --state RELATED,ESTABLISHED -m owner --uid-owner globaleaks -d 127.0.0.1 -j ACCEPT
-        ip6tables -m comment --comment "globaleaks" -A OUTPUT -m state --state RELATED,ESTABLISHED -m owner --uid-owner globaleaks -d ::1 -j ACCEPT
-        iptables -m comment --comment "globaleaks" -t nat -A OUTPUT ! -o lo -p tcp -m owner --uid-owner ${USERNAME} -m tcp -j REDIRECT --to-ports 9050
-        iptables -m comment --comment "globaleaks" -t filter -A OUTPUT -p tcp -m owner --uid-owner ${USERNAME} -m tcp -d 127.0.0.1 --dport 9050 -j ACCEPT
-        iptables -m comment --comment "globaleaks" -t filter -A OUTPUT ! -o lo -m owner --uid-owner ${USERNAME} -j DROP
-        ip6tables -m comment --comment "globaleaks" -t nat -A OUTPUT ! -o lo -p tcp -m owner --uid-owner ${USERNAME} -m tcp -j REDIRECT --to-ports 9050
-        ip6tables -m comment --comment "globaleaks" -t filter -A OUTPUT -p tcp -m owner --uid-owner ${USERNAME} -m tcp -d ::1 --dport 9050 -j ACCEPT
-        ip6tables -m comment --comment "globaleaks" -t filter -A OUTPUT ! -o lo -m owner --uid-owner ${USERNAME} -j DROP
     else
         iptables -m comment --comment "globaleaks" -t filter -A INPUT -p tcp --dport 8080 -j ACCEPT
         ip6tables -m comment --comment "globaleaks" -t filter -A INPUT -p tcp --dport 8080 -j ACCEPT
@@ -154,26 +146,7 @@ network_sandboxing_start()
 
         iptables -m comment --comment "globaleaks" -t nat -A OUTPUT -o lo -p tcp --dport 443 -j REDIRECT --to-port 8443
         ip6tables -m comment --comment "globaleaks" -t nat -A OUTPUT -o lo -p tcp --dport 443 -j REDIRECT --to-port 8443
-
-        # Enable enstablished connections, new connections on used tcp and udp ports
-        iptables -m comment --comment "globaleaks" -A OUTPUT -m state --state RELATED,ESTABLISHED -m owner --uid-owner globaleaks -j ACCEPT
-        ip6tables -m comment --comment "globaleaks" -A OUTPUT -m state --state RELATED,ESTABLISHED -m owner --uid-owner globaleaks -j ACCEPT
-
-        declare -a PORTS=("25" "80" "53" "443" "465" "587" "9050")
-        for PORT in "${PORTS[@]}"; do
-            iptables -m comment --comment "globaleaks" -t filter -A OUTPUT -p tcp -m owner --uid-owner ${USERNAME} -m tcp --dport $PORT -j ACCEPT
-            ip6tables -m comment --comment "globaleaks" -t filter -A OUTPUT -p tcp -m owner --uid-owner ${USERNAME} -m tcp --dport $PORT -j ACCEPT
-        done
-
-        declare -a PORTS=("53")
-        for PORT in "${PORTS[@]}"; do
-            iptables -m comment --comment "globaleaks" -t filter -A OUTPUT -p udp -m owner --uid-owner ${USERNAME} -m udp --dport $PORT -j ACCEPT
-            ip6tables -m comment --comment "globaleaks" -t filter -A OUTPUT -p udp -m owner --uid-owner ${USERNAME} -m udp --dport $PORT -j ACCEPT
-        done
     fi
-
-    iptables -m comment --comment "globaleaks" -t filter -A OUTPUT ! -o lo -m owner --uid-owner ${USERNAME} -j DROP
-    ip6tables -m comment --comment "globaleaks" -t filter -A OUTPUT ! -o lo -m owner --uid-owner ${USERNAME} -j DROP
 
     log_action_end_msg 0
 }
